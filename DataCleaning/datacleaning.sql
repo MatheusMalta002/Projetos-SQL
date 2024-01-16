@@ -1,5 +1,6 @@
-/*
+
 ---------------------------------------------------------------------------------------------------------
+
 
 -- 1. Padronizando o formato da data
 
@@ -7,7 +8,7 @@ ALTER TABLE Limpeza.dbo.NashvilleHousing
 ALTER COLUMN SaleDate date;
 
 
-[Versão alternativa criando uma nova coluna]
+-- [Versão alternativa criando uma nova coluna]
 
 ALTER TABLE Limpeza.dbo.NashvilleHousing
 ADD SaleDateConverted date;
@@ -15,7 +16,9 @@ ADD SaleDateConverted date;
 UPDATE Limpeza.dbo.NashvilleHousing
 SET SaleDateConverted = CONVERT(date, SaleDate)
 
+
 ---------------------------------------------------------------------------------------------------------
+
 
 -- 2. Preenchendo os valores nulos na coluna PropertyAddress
 
@@ -42,7 +45,9 @@ JOIN Limpeza.dbo.NashvilleHousing C2
 	ON (C1.ParcelID = C2.ParcelID) AND (C1.[UniqueID ] != C2.[UniqueID ])
 WHERE (C1.PropertyAddress IS NULL) 
 
+
 ---------------------------------------------------------------------------------------------------------
+
 
 -- 3. Dividindo o endereço em colunas individuais
 
@@ -66,11 +71,113 @@ SET PropertySplitAddress = SUBSTRING(PropertyAddress, 0, CHARINDEX(',', Property
 UPDATE Limpeza.dbo.NashvilleHousing
 SET PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) +1, LEN(PropertyAddress))
 
+
 ---------------------------------------------------------------------------------------------------------
 
-Em progresso...
 
-*/
+-- 4. Dividindo o endereço do proprietário em colunas individuais
+
+SELECT PARSENAME(REPLACE(OwnerAddress, ',', '.'), 3),
+PARSENAME(REPLACE(OwnerAddress, ',', '.'), 2),
+PARSENAME(REPLACE(OwnerAddress, ',', '.'), 1)
+FROM Limpeza.dbo.NashvilleHousing;
+
+
+ALTER TABLE Limpeza.dbo.NashvilleHousing
+ADD OwnerSplitAddress Nvarchar(255)
+
+UPDATE Limpeza.dbo.NashvilleHousing
+SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 3)
+
+ALTER TABLE Limpeza.dbo.NashvilleHousing
+ADD OwnerSplitCity Nvarchar(255)
+
+UPDATE Limpeza.dbo.NashvilleHousing
+SET OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 2)
+
+ALTER TABLE Limpeza.dbo.NashvilleHousing
+ADD OwnerSplitState Nvarchar(255)
+
+UPDATE Limpeza.dbo.NashvilleHousing
+SET OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 1)
+
+
+---------------------------------------------------------------------------------------------------------
+
+
+-- 5. Padronizando os nomes na coluna SoldAsVacant
+
+SELECT DISTINCT(SoldAsVacant), COUNT(*)
+FROM NashvilleHousing
+GROUP BY SoldAsVacant
+ORDER BY 2
+
+
+SELECT SoldAsVacant,
+	CASE 
+		WHEN SoldAsVacant = 'Y' THEN 'Yes'
+		WHEN SoldAsVacant = 'N' THEN 'No'
+		ELSE SoldAsVacant
+	END
+FROM NashvilleHousing
+WHERE SoldAsVacant = 'Y';
+
+
+UPDATE NashvilleHousing
+SET SoldAsVacant = CASE 
+						WHEN SoldAsVacant = 'Y' THEN 'Yes'
+						WHEN SoldAsVacant = 'N' THEN 'No'
+						ELSE SoldAsVacant
+					END
+
+
+---------------------------------------------------------------------------------------------------------
+
+
+-- 6. Eliminando duplicatas utilizando Common Table Expression
+
+WITH RowNumCTE AS (
+SELECT *,
+	ROW_NUMBER() OVER( 
+		PARTITION BY 
+		ParcelID,
+		PropertyAddress,
+		SalePrice,
+		SaleDate,
+		LegalReference
+	ORDER BY 
+		UniqueID ) row_num
+FROM Limpeza.dbo.NashvilleHousing
+)
+DELETE
+FROM RowNumCTE
+WHERE row_num > 1
+
+---------------------------------------------------------------------------------------------------------
+
+
+-- 7. Apagando colunas não utilizadas
+
+ALTER TABLE  Limpeza.dbo.NashvilleHousing
+DROP COLUMN PropertyAddress, OwnerAddress, TaxDistrict
+
+select * from NashvilleHousing
+
+
+---------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
